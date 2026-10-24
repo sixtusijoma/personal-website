@@ -83,11 +83,11 @@ function App() {
         );
         break;
         case AppType.Github:
-          openWindow(resumeWindow, {
-            title: "GitHub",
-            icon: "/github.svg",
-            url: "https://github.com/sixtusijoma",
-          });
+          window.open(
+            "https://github.com/sixtusijoma",
+            "_blank",
+            "noopener,noreferrer",
+          );
           break;
     }
   };

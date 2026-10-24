@@ -3,8 +3,11 @@
   "tasks": [
     {
       "label": "frontend: dev",
-      "type": "shell",
-      "command": "npm.cmd run dev",
+      "type": "process",
+      "command": "node",
+      "args": [
+        "${workspaceFolder}/frontend/node_modules/vite/bin/vite.js"
+      ],
       "options": {
         "cwd": "${workspaceFolder}/frontend"
       },
@@ -24,6 +27,29 @@
         "reveal": "always",
         "panel": "dedicated"
       }
+    },
+    {
+      "label": "frontend: stop",
+      "type": "process",
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-Command",
+        "$ids = netstat -ano | Select-String ':5173\\s+.*LISTENING' | ForEach-Object { ($_ -split '\\s+')[-1] } | Select-Object -Unique; foreach ($id in $ids) { if ($id -match '^\\d+$') { Stop-Process -Id $id -Force -ErrorAction SilentlyContinue } }"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "backend: build",
+      "type": "process",
+      "command": "dotnet",
+      "args": [
+        "build",
+        "${workspaceFolder}/backend/backend.csproj",
+        "/property:GenerateFullPaths=true",
+        "/consoleloggerparameters:NoSummary"
+      ],
+      "problemMatcher": "$msCompile"
     }
   ]
 }

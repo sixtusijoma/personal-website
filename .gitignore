@@ -5,3 +5,7 @@ dist/
 dist-ssr/
 *.user
 .DS_Store
+backend/profile.json
+.env
+.env.*
+debug-*.log
