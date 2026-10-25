@@ -4,7 +4,6 @@ public enum ChatStatus
 {
     Ok,
     GeminiError,
-    ProfileMissing,
     Exception
 }
 

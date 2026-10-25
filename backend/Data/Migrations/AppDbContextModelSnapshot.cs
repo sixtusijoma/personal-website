@@ -31,8 +31,7 @@ namespace backend.Data.Migrations
 
                     b.Property<string>("Answer")
                         .IsRequired()
-                        .HasMaxLength(8000)
-                        .HasColumnType("character varying(8000)")
+                        .HasColumnType("text")
                         .HasColumnName("answer");
 
                     b.Property<DateTimeOffset>("Created")
@@ -44,8 +43,7 @@ namespace backend.Data.Migrations
                         .HasColumnName("gemini_status_code");
 
                     b.Property<string>("InteractionId")
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)")
+                        .HasColumnType("text")
                         .HasColumnName("interaction_id");
 
                     b.Property<string>("IpHash")
@@ -64,14 +62,12 @@ namespace backend.Data.Migrations
                         .HasColumnName("model");
 
                     b.Property<string>("PreviousInteractionId")
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)")
+                        .HasColumnType("text")
                         .HasColumnName("previous_interaction_id");
 
                     b.Property<string>("Question")
                         .IsRequired()
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
+                        .HasColumnType("text")
                         .HasColumnName("question");
 
                     b.Property<Guid>("SessionId")
@@ -85,8 +81,7 @@ namespace backend.Data.Migrations
                         .HasColumnName("status");
 
                     b.Property<string>("UserAgent")
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)")
+                        .HasColumnType("text")
                         .HasColumnName("user_agent");
 
                     b.HasKey("Id")

@@ -1,14 +1,24 @@
 using System.Diagnostics;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using backend.Data;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
+string[] requiredKeys = ["GEMINI_API_KEY", "PROFILE_JSON", "SUPABASE_DB_CONNECTION", "IP_HASH_SALT"];
+var missing = requiredKeys.Where(k => string.IsNullOrWhiteSpace(builder.Configuration[k])).ToList();
+
+if (missing.Count > 0)
+{
+    throw new InvalidOperationException($"Missing required settings: {string.Join(", ", missing)}");
+}
+
+var geminiApiKey = builder.Configuration["GEMINI_API_KEY"]!;
+var profile = builder.Configuration["PROFILE_JSON"]!;
+var supabaseConnection = builder.Configuration["SUPABASE_DB_CONNECTION"]!;
+var ipHashSalt = builder.Configuration["IP_HASH_SALT"]!;
 
 builder.Services.AddCors(options =>
 {
@@ -16,81 +26,56 @@ builder.Services.AddCors(options =>
         policy.WithOrigins("http://localhost:5173").AllowAnyHeader().AllowAnyMethod());
 });
 
-// Chat logging to Supabase Postgres. Optional: if SUPABASE_DB_CONNECTION is not set,
-// no DbContext is registered and the chat endpoint simply skips logging.
-var supabaseConnection = builder.Configuration["SUPABASE_DB_CONNECTION"];
-if (!string.IsNullOrWhiteSpace(supabaseConnection))
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseNpgsql(supabaseConnection).UseSnakeCaseNamingConvention());
+
+builder.Services.AddHttpClient("gemini", c =>
 {
-    builder.Services.AddDbContext<AppDbContext>(options =>
-        options.UseNpgsql(supabaseConnection).UseSnakeCaseNamingConvention());
-}
+    c.BaseAddress = new Uri("https://generativelanguage.googleapis.com/");
+    c.DefaultRequestHeaders.Add("x-goog-api-key", geminiApiKey);
+});
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi();
-}
-
 app.UseHttpsRedirection();
 
-var geminiApiKey = builder.Configuration["GEMINI_API_KEY"];
-var profile = builder.Configuration["PROFILE_JSON"];
-var ipHashSalt = builder.Configuration["IP_HASH_SALT"] ?? throw new InvalidOperationException("IP_HASH_SALT is not set.");
-var summaries = new[]
+var geminiJsonOptions = new JsonSerializerOptions
 {
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
+    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
 };
 
-app.MapGet("/weatherforecast", () =>
+app.MapPost("/api/chat", async (ChatRequest request, HttpContext httpContext, AppDbContext db, IHttpClientFactory httpClientFactory, ILogger<Program> logger) =>
 {
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast");
+    if (string.IsNullOrWhiteSpace(request.Question))
+    {
+        return Results.BadRequest();
+    }
 
-app.MapPost("/api/chat", async (ChatRequest request, HttpContext httpContext, ILogger<Program> logger)  =>
-{
     const string model = "gemini-3.5-flash-lite";
+    const string failureAnswer = "Something went wrong. Try again in a minute.";
     var stopwatch = Stopwatch.StartNew();
-
-    static string Truncate(string value, int maxLength) =>
-        value.Length <= maxLength ? value : value[..maxLength];
+    var previousInteractionId = string.IsNullOrWhiteSpace(request.PreviousInteractionId) ? null : request.PreviousInteractionId;
 
     async Task LogChatAsync(string answer, ChatStatus status, int? geminiStatusCode, string? interactionId)
     {
         try
         {
-            var db = httpContext.RequestServices.GetService<AppDbContext>();
-            if (db is null)
-            {
-                return;
-            }
-
             db.ChatLogs.Add(new ChatLog
             {
                 Id = Guid.NewGuid(),
                 SessionId = request.SessionId ?? Guid.Empty,
-                Question = Truncate(request.Question ?? "", 2000),
-                Answer = Truncate(answer, 8000),
+                Question = request.Question,
+                Answer = answer,
                 Status = status,
                 GeminiStatusCode = geminiStatusCode,
-                InteractionId = interactionId is null ? null : Truncate(interactionId, 256),
-                PreviousInteractionId = request.PreviousInteractionId is null ? null : Truncate(request.PreviousInteractionId, 256),
+                InteractionId = interactionId,
+                PreviousInteractionId = previousInteractionId,
                 Model = model,
                 Latency = (int)stopwatch.ElapsedMilliseconds,
                 // TODO: behind Cloudflare this is the proxy's IP. Use ForwardedHeaders
                 // (UseForwardedHeaders with ForwardedHeaders = "CF-Connecting-IP") to get the real client IP.
                 IpHash = IpHasher.Hash(httpContext.Connection.RemoteIpAddress?.ToString(), ipHashSalt),
-                UserAgent = Truncate(httpContext.Request.Headers.UserAgent.ToString(), 512),
+                UserAgent = httpContext.Request.Headers.UserAgent.ToString(),
                 Created = DateTimeOffset.UtcNow,
             });
             await db.SaveChangesAsync();
@@ -101,44 +86,38 @@ app.MapPost("/api/chat", async (ChatRequest request, HttpContext httpContext, IL
         }
     }
 
-    if (string.IsNullOrWhiteSpace(profile))
-    {
-        const string missingAnswer = "Profile is not configured.";
-        await LogChatAsync(missingAnswer, ChatStatus.ProfileMissing, null, null);
-        return Results.Ok(new { answer = missingAnswer });
-    }
-
     int? geminiStatusCode = null;
     try
     {
-        using var client = new HttpClient();
-        client.DefaultRequestHeaders.Add("x-goog-api-key", geminiApiKey);
+        var client = httpClientFactory.CreateClient("gemini");
 
         var systemInstruction = $"""
         You answer questions about Sixtus Ijoma for visitors to his personal site.
-        Use only the profile below. If the profile does not say, find a graceful way to say that you dont have access to that information. Your personality is warm and eager to answer questions about Sixtus.
+        Use only the profile below. If the profile does not say, find a graceful way to say that you don't have access to that information. Your personality is warm and eager to answer questions about Sixtus.
         The user is typing to you on a mock command line interface, so you cannot use any markdown or special styling. DO NOT answer any questions unrelated to Sixtus.
         Profile:
         {profile}
         """;
 
-        object payload = string.IsNullOrEmpty(request.PreviousInteractionId)
-            ? new { model, input = request.Question, system_instruction = systemInstruction }
-            : new { model, input = request.Question, previous_interaction_id = request.PreviousInteractionId, system_instruction = systemInstruction };
+        var payload = new
+        {
+            model,
+            input = request.Question,
+            previous_interaction_id = previousInteractionId,
+            system_instruction = systemInstruction
+        };
 
-        var response = await client.PostAsJsonAsync(
-            "https://generativelanguage.googleapis.com/v1beta/interactions",
-            payload);
+        var response = await client.PostAsJsonAsync("v1beta/interactions", payload, geminiJsonOptions);
         geminiStatusCode = (int)response.StatusCode;
 
-        var body = await response.Content.ReadAsStringAsync();
         if (!response.IsSuccessStatusCode)
         {
-            var errorAnswer = $"Gemini returned {(int)response.StatusCode}. Try again in a minute.";
-            await LogChatAsync(errorAnswer, ChatStatus.GeminiError, geminiStatusCode, null);
-            return Results.Ok(new { answer = errorAnswer });
+            logger.LogWarning("Gemini returned status code {GeminiStatusCode}.", geminiStatusCode);
+            await LogChatAsync(failureAnswer, ChatStatus.GeminiError, geminiStatusCode, null);
+            return Results.Ok(new { answer = failureAnswer });
         }
 
+        var body = await response.Content.ReadAsStringAsync();
         using var parsed = JsonDocument.Parse(body);
         var json = parsed.RootElement;
         var interactionId = json.TryGetProperty("id", out var id) ? id.GetString() : null;
@@ -153,28 +132,12 @@ app.MapPost("/api/chat", async (ChatRequest request, HttpContext httpContext, IL
     catch (Exception ex)
     {
         logger.LogError(ex, "Chat request failed.");
-        const string failureAnswer = "Something went wrong. Try again in a minute.";
         await LogChatAsync(failureAnswer, ChatStatus.Exception, geminiStatusCode, null);
         return Results.Ok(new { answer = failureAnswer });
     }
 });
 app.UseCors();
 
-
-
 app.Run();
 
 record ChatRequest(string Question, string? PreviousInteractionId, Guid? SessionId);
-
-
-
-// after app.UseHttpsRedirection()
-
-
-
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
-
