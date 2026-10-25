@@ -22,7 +22,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(e => e.IpHash).HasMaxLength(64);
             entity.Property(e => e.UserAgent).HasMaxLength(512);
 
-            entity.HasIndex(e => e.CreatedAt);
+            entity.HasIndex(e => e.Created);
             entity.HasIndex(e => e.SessionId);
         });
     }

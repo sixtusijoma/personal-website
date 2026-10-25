@@ -35,9 +35,9 @@ namespace backend.Data.Migrations
                         .HasColumnType("character varying(8000)")
                         .HasColumnName("answer");
 
-                    b.Property<DateTimeOffset>("CreatedAt")
+                    b.Property<DateTimeOffset>("Created")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
+                        .HasColumnName("created");
 
                     b.Property<int?>("GeminiStatusCode")
                         .HasColumnType("integer")
@@ -53,9 +53,9 @@ namespace backend.Data.Migrations
                         .HasColumnType("character varying(64)")
                         .HasColumnName("ip_hash");
 
-                    b.Property<int>("LatencyMs")
+                    b.Property<int>("Latency")
                         .HasColumnType("integer")
-                        .HasColumnName("latency_ms");
+                        .HasColumnName("latency");
 
                     b.Property<string>("Model")
                         .IsRequired()
@@ -92,8 +92,8 @@ namespace backend.Data.Migrations
                     b.HasKey("Id")
                         .HasName("pk_chat_logs");
 
-                    b.HasIndex("CreatedAt")
-                        .HasDatabaseName("ix_chat_logs_created_at");
+                    b.HasIndex("Created")
+                        .HasDatabaseName("ix_chat_logs_created");
 
                     b.HasIndex("SessionId")
                         .HasDatabaseName("ix_chat_logs_session_id");

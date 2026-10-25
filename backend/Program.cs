@@ -37,7 +37,7 @@ app.UseHttpsRedirection();
 
 var geminiApiKey = builder.Configuration["GEMINI_API_KEY"];
 var profile = builder.Configuration["PROFILE_JSON"];
-var ipHashSalt = IpHasher.ResolveSalt(builder.Configuration, app.Environment, app.Logger);
+var ipHashSalt = builder.Configuration["IP_HASH_SALT"] ?? throw new InvalidOperationException("IP_HASH_SALT is not set.");
 var summaries = new[]
 {
     "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
@@ -86,12 +86,12 @@ app.MapPost("/api/chat", async (ChatRequest request, HttpContext httpContext, IL
                 InteractionId = interactionId is null ? null : Truncate(interactionId, 256),
                 PreviousInteractionId = request.PreviousInteractionId is null ? null : Truncate(request.PreviousInteractionId, 256),
                 Model = model,
-                LatencyMs = (int)stopwatch.ElapsedMilliseconds,
+                Latency = (int)stopwatch.ElapsedMilliseconds,
                 // TODO: behind Cloudflare this is the proxy's IP. Use ForwardedHeaders
                 // (UseForwardedHeaders with ForwardedHeaders = "CF-Connecting-IP") to get the real client IP.
                 IpHash = IpHasher.Hash(httpContext.Connection.RemoteIpAddress?.ToString(), ipHashSalt),
                 UserAgent = Truncate(httpContext.Request.Headers.UserAgent.ToString(), 512),
-                CreatedAt = DateTimeOffset.UtcNow,
+                Created = DateTimeOffset.UtcNow,
             });
             await db.SaveChangesAsync();
         }

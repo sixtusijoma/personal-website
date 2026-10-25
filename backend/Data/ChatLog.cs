@@ -28,11 +28,12 @@ public class ChatLog
 
     public string Model { get; set; } = "";
 
-    public int LatencyMs { get; set; }
+    // milliseconds
+    public int Latency { get; set; }
 
     public string? IpHash { get; set; }
 
     public string? UserAgent { get; set; }
 
-    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset Created { get; set; } = DateTimeOffset.UtcNow;
 }
