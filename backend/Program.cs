@@ -18,7 +18,6 @@ if (missing.Count > 0)
 var geminiApiKey = builder.Configuration["GEMINI_API_KEY"]!;
 var profile = builder.Configuration["PROFILE_JSON"]!;
 var supabaseConnection = builder.Configuration["SUPABASE_DB_CONNECTION"]!;
-var ipHashSalt = builder.Configuration["IP_HASH_SALT"]!;
 
 builder.Services.AddCors(options =>
 {
@@ -28,6 +27,8 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(supabaseConnection).UseSnakeCaseNamingConvention());
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ChatLogger>();
 
 builder.Services.AddHttpClient("gemini", c =>
 {
@@ -44,7 +45,7 @@ var geminiJsonOptions = new JsonSerializerOptions
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
 };
 
-app.MapPost("/api/chat", async (ChatRequest request, HttpContext httpContext, AppDbContext db, IHttpClientFactory httpClientFactory, ILogger<Program> logger) =>
+app.MapPost("/api/chat", async (ChatRequest request, ChatLogger chatLogger, IHttpClientFactory httpClientFactory, ILogger<Program> logger) =>
 {
     if (string.IsNullOrWhiteSpace(request.Question))
     {
@@ -53,38 +54,8 @@ app.MapPost("/api/chat", async (ChatRequest request, HttpContext httpContext, Ap
 
     const string model = "gemini-3.5-flash-lite";
     const string failureAnswer = "Something went wrong. Try again in a minute.";
-    var stopwatch = Stopwatch.StartNew();
     var previousInteractionId = string.IsNullOrWhiteSpace(request.PreviousInteractionId) ? null : request.PreviousInteractionId;
-
-    async Task LogChatAsync(string answer, ChatStatus status, int? geminiStatusCode, string? interactionId)
-    {
-        try
-        {
-            db.ChatLogs.Add(new ChatLog
-            {
-                Id = Guid.NewGuid(),
-                SessionId = request.SessionId ?? Guid.Empty,
-                Question = request.Question,
-                Answer = answer,
-                Status = status,
-                GeminiStatusCode = geminiStatusCode,
-                InteractionId = interactionId,
-                PreviousInteractionId = previousInteractionId,
-                Model = model,
-                Latency = (int)stopwatch.ElapsedMilliseconds,
-                // TODO: behind Cloudflare this is the proxy's IP. Use ForwardedHeaders
-                // (UseForwardedHeaders with ForwardedHeaders = "CF-Connecting-IP") to get the real client IP.
-                IpHash = IpHasher.Hash(httpContext.Connection.RemoteIpAddress?.ToString(), ipHashSalt),
-                UserAgent = httpContext.Request.Headers.UserAgent.ToString(),
-                Created = DateTimeOffset.UtcNow,
-            });
-            await db.SaveChangesAsync();
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to write chat log.");
-        }
-    }
+    var logContext = new ChatLogContext(request, previousInteractionId, model, Stopwatch.StartNew());
 
     int? geminiStatusCode = null;
     try
@@ -113,7 +84,7 @@ app.MapPost("/api/chat", async (ChatRequest request, HttpContext httpContext, Ap
         if (!response.IsSuccessStatusCode)
         {
             logger.LogWarning("Gemini returned status code {GeminiStatusCode}.", geminiStatusCode);
-            await LogChatAsync(failureAnswer, ChatStatus.GeminiError, geminiStatusCode, null);
+            await chatLogger.Log(logContext, failureAnswer, ChatStatus.GeminiError, geminiStatusCode, null);
             return Results.Ok(new { answer = failureAnswer });
         }
 
@@ -126,13 +97,13 @@ app.MapPost("/api/chat", async (ChatRequest request, HttpContext httpContext, Ap
             .Last(s => s.GetProperty("type").GetString() == "model_output").
             GetProperty("content")[0].GetProperty("text").GetString() ?? "";
 
-        await LogChatAsync(answer, ChatStatus.Ok, geminiStatusCode, interactionId);
+        await chatLogger.Log(logContext, answer, ChatStatus.Ok, geminiStatusCode, interactionId);
         return Results.Ok(new { answer, interactionId });
     }
     catch (Exception ex)
     {
         logger.LogError(ex, "Chat request failed.");
-        await LogChatAsync(failureAnswer, ChatStatus.Exception, geminiStatusCode, null);
+        await chatLogger.Log(logContext, failureAnswer, ChatStatus.Exception, geminiStatusCode, null);
         return Results.Ok(new { answer = failureAnswer });
     }
 });
@@ -140,4 +111,4 @@ app.UseCors();
 
 app.Run();
 
-record ChatRequest(string Question, string? PreviousInteractionId, Guid? SessionId);
+public record ChatRequest(string Question, string? PreviousInteractionId, Guid? SessionId);
