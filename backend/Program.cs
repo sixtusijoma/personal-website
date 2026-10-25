@@ -65,6 +65,8 @@ app.MapPost("/api/chat", async (ChatRequest request, ChatLogger chatLogger, IHtt
         var systemInstruction = $"""
         You answer questions about Sixtus Ijoma for visitors to his personal site.
         Use only the profile below. If the profile does not say, find a graceful way to say that you don't have access to that information. Your personality is warm and eager to answer questions about Sixtus.
+        Keep answers brief and warm: one to three sentences that fully answer the question. Lead with the direct answer and include only the details the question asks for. Don't list extra facts from the profile; the visitor can ask a follow-up for more. If asked to tell more about something, expand on what you just said instead of asking them to choose.
+        When an answer covers more than one job, name which job each detail is from.
         The user is typing to you on a mock command line interface, so you cannot use any markdown or special styling. DO NOT answer any questions unrelated to Sixtus.
         Profile:
         {profile}
@@ -93,9 +95,23 @@ app.MapPost("/api/chat", async (ChatRequest request, ChatLogger chatLogger, IHtt
         var json = parsed.RootElement;
         var interactionId = json.TryGetProperty("id", out var id) ? id.GetString() : null;
 
-        var answer = json.GetProperty("steps").EnumerateArray()
-            .Last(s => s.GetProperty("type").GetString() == "model_output").
-            GetProperty("content")[0].GetProperty("text").GetString() ?? "";
+        string? answer = null;
+        if (json.TryGetProperty("steps", out var steps) && steps.ValueKind == JsonValueKind.Array)
+        {
+            answer = steps.EnumerateArray()
+                .Where(s => s.TryGetProperty("type", out var type) && type.GetString() == "model_output")
+                .Where(s => s.TryGetProperty("content", out var content) && content.ValueKind == JsonValueKind.Array)
+                .SelectMany(s => s.GetProperty("content").EnumerateArray())
+                .Select(part => part.TryGetProperty("text", out var text) ? text.GetString() : null)
+                .LastOrDefault(text => !string.IsNullOrWhiteSpace(text));
+        }
+
+        if (answer is null)
+        {
+            logger.LogWarning("Gemini returned no answer text for interaction {InteractionId}.", interactionId);
+            await chatLogger.Log(logContext, failureAnswer, ChatStatus.GeminiError, geminiStatusCode, interactionId);
+            return Results.Ok(new { answer = failureAnswer });
+        }
 
         await chatLogger.Log(logContext, answer, ChatStatus.Ok, geminiStatusCode, interactionId);
         return Results.Ok(new { answer, interactionId });
