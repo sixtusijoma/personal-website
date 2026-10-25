@@ -19,7 +19,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(e => e.InteractionId).HasMaxLength(256);
             entity.Property(e => e.PreviousInteractionId).HasMaxLength(256);
             entity.Property(e => e.Model).HasMaxLength(100).IsRequired();
-            entity.Property(e => e.IpAddress).HasMaxLength(64);
+            entity.Property(e => e.IpHash).HasMaxLength(64);
             entity.Property(e => e.UserAgent).HasMaxLength(512);
 
             entity.HasIndex(e => e.CreatedAt);

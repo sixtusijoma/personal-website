@@ -48,10 +48,10 @@ namespace backend.Data.Migrations
                         .HasColumnType("character varying(256)")
                         .HasColumnName("interaction_id");
 
-                    b.Property<string>("IpAddress")
+                    b.Property<string>("IpHash")
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)")
-                        .HasColumnName("ip_address");
+                        .HasColumnName("ip_hash");
 
                     b.Property<int>("LatencyMs")
                         .HasColumnType("integer")

@@ -23,7 +23,6 @@ if (!string.IsNullOrWhiteSpace(supabaseConnection))
 {
     builder.Services.AddDbContext<AppDbContext>(options =>
         options.UseNpgsql(supabaseConnection).UseSnakeCaseNamingConvention());
-    builder.Services.AddHostedService<ChatLogRetentionService>();
 }
 
 var app = builder.Build();
@@ -38,6 +37,7 @@ app.UseHttpsRedirection();
 
 var geminiApiKey = builder.Configuration["GEMINI_API_KEY"];
 var profile = builder.Configuration["PROFILE_JSON"];
+var ipHashSalt = IpHasher.ResolveSalt(builder.Configuration, app.Environment, app.Logger);
 var summaries = new[]
 {
     "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
@@ -89,7 +89,7 @@ app.MapPost("/api/chat", async (ChatRequest request, HttpContext httpContext, IL
                 LatencyMs = (int)stopwatch.ElapsedMilliseconds,
                 // TODO: behind Cloudflare this is the proxy's IP. Use ForwardedHeaders
                 // (UseForwardedHeaders with ForwardedHeaders = "CF-Connecting-IP") to get the real client IP.
-                IpAddress = httpContext.Connection.RemoteIpAddress?.ToString(),
+                IpHash = IpHasher.Hash(httpContext.Connection.RemoteIpAddress?.ToString(), ipHashSalt),
                 UserAgent = Truncate(httpContext.Request.Headers.UserAgent.ToString(), 512),
                 CreatedAt = DateTimeOffset.UtcNow,
             });
