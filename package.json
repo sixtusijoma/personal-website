@@ -1,8 +1,0 @@
-{
-  "dependencies": {
-    "winbox": "^0.2.82"
-  },
-  "devDependencies": {
-    "@types/winbox": "^0.2.6"
-  }
-}

@@ -16,12 +16,13 @@
 
 .console-line {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   gap: 0.5ch;
 }
 
 .console-input {
-  flex: 1;
+  flex: 1 1 12ch;
   min-width: 0;
   width: auto;
   background: black;
@@ -31,4 +32,17 @@
   font: inherit;
   caret-color: white;
   caret-shape: block;
+}
+
+/* Phones: 16px stops iOS from zooming into the input, and the input gets its own full line. */
+@media (max-width: 767px) {
+  .console {
+    font-size: 16px;
+  }
+
+  .console-input {
+    flex-basis: 100%;
+    padding: 4px 0;
+    border-bottom: 1px solid #555;
+  }
 }

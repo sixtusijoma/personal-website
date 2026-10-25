@@ -1,4 +1,4 @@
-import AppIcon from './components/AppIcon';
+﻿import AppIcon from './components/AppIcon';
 import './App.css';
 import WinBox from 'winbox/src/js/winbox';
 import 'winbox/dist/css/winbox.min.css';
@@ -14,8 +14,6 @@ import gitHubIcon from "./assets/github.svg"
 function App() {
   const resumeWindow = useRef<InstanceType<typeof WinBox> | null>(null);
   const consoleWindow = useRef<InstanceType<typeof WinBox> | null>(null);
-  const linkedInWindow = useRef<InstanceType<typeof WinBox> | null>(null);
-  const githubWindow = useRef<InstanceType<typeof WinBox> | null>(null);
   const appsOpen = useRef(0);
   const shift = 10;
 
@@ -56,6 +54,7 @@ function App() {
           title: "Resume",
           icon: "/document-title.svg",
           url: "/sixtus_resume.html",
+          ...(window.innerWidth < 768 && { width: "90%", height: "70%", x: "center", y: "center" }),
         });
         break;
       case AppType.Console: {
@@ -72,6 +71,7 @@ function App() {
           background: "#000000",
           icon: "/terminal-title.svg",
           mount: container,
+          ...(window.innerWidth < 768 && { width: "90%", height: "60%", x: "center", y: 80 }),
         }, () => root.unmount());
         break;
       }
