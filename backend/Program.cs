@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -7,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-string[] requiredKeys = ["GEMINI_API_KEY", "PROFILE_JSON", "SUPABASE_DB_CONNECTION", "IP_HASH_SALT"];
+string[] requiredKeys = ["GEMINI_API_KEY", "PROFILE_JSON", "SUPABASE_DB_CONNECTION", "IP_HASH_SALT", "BIRTH_DATE"];
 var missing = requiredKeys.Where(k => string.IsNullOrWhiteSpace(builder.Configuration[k])).ToList();
 
 if (missing.Count > 0)
@@ -18,6 +19,11 @@ if (missing.Count > 0)
 var geminiApiKey = builder.Configuration["GEMINI_API_KEY"]!;
 var profile = builder.Configuration["PROFILE_JSON"]!;
 var supabaseConnection = builder.Configuration["SUPABASE_DB_CONNECTION"]!;
+
+if (!DateOnly.TryParseExact(builder.Configuration["BIRTH_DATE"], "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var birthDate))
+{
+    throw new InvalidOperationException("BIRTH_DATE must be in yyyy-MM-dd format.");
+}
 
 builder.Services.AddCors(options =>
 {
@@ -62,12 +68,15 @@ app.MapPost("/api/chat", async (ChatRequest request, ChatLogger chatLogger, IHtt
     {
         var client = httpClientFactory.CreateClient("gemini");
 
+        var age = CalculateAge(birthDate);
+
         var systemInstruction = $"""
         You answer questions about Sixtus Ijoma for visitors to his personal site.
         Use only the profile below. If the profile does not say, find a graceful way to say that you don't have access to that information. Your personality is warm and eager to answer questions about Sixtus.
         Keep answers brief and warm: one to three sentences that fully answer the question. Lead with the direct answer and include only the details the question asks for. Don't list extra facts from the profile; the visitor can ask a follow-up for more. If asked to tell more about something, expand on what you just said instead of asking them to choose.
         When an answer covers more than one job, name which job each detail is from.
         The user is typing to you on a mock command line interface, so you cannot use any markdown or special styling. DO NOT answer any questions unrelated to Sixtus.
+        Sixtus is {age} years old.
         Profile:
         {profile}
         """;
@@ -126,5 +135,17 @@ app.MapPost("/api/chat", async (ChatRequest request, ChatLogger chatLogger, IHtt
 app.UseCors();
 
 app.Run();
+
+static int CalculateAge(DateOnly birthDate)
+{
+    var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeBySystemTimeZoneId(DateTime.UtcNow, "America/New_York"));
+    var age = today.Year - birthDate.Year;
+    if (today < birthDate.AddYears(age))
+    {
+        age--;
+    }
+
+    return age;
+}
 
 public record ChatRequest(string Question, string? PreviousInteractionId, Guid? SessionId);

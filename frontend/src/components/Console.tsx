@@ -25,7 +25,7 @@ function Console() {
 
     setPending(true);
     setCommand("");
-    setPrevCommands(prev => prev + prompt + question + "\n");
+    setPrevCommands(prev => prev + prompt + question + "\n\n");
 
     const result = await ask(question, interactionId, sessionIdRef.current);
 
