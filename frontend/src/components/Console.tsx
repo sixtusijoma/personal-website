@@ -1,6 +1,6 @@
 import "./Console.css";
-import { ask } from "../api/chat";
-import { useRef, useState } from "react";
+import { ask, wakeServer } from "../api/chat";
+import { useEffect, useRef, useState } from "react";
 
 function Console() {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -11,6 +11,11 @@ function Console() {
 
   const [prevCommands, setPrevCommands] = useState("");
   const [pending, setPending] = useState(false);
+  const [slow, setSlow] = useState(false);
+
+  useEffect(() => {
+    wakeServer();
+  }, []);
 
   const handleKeyDown = async (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key !== "Enter" || pending) {
@@ -27,7 +32,7 @@ function Console() {
     setCommand("");
     setPrevCommands(prev => prev + prompt + question + "\n\n");
 
-    const result = await ask(question, interactionId, sessionIdRef.current);
+    const result = await ask(question, interactionId, sessionIdRef.current, () => setSlow(true));
 
     if (result.interactionId) {
       setInteractionId(result.interactionId);
@@ -35,6 +40,7 @@ function Console() {
 
     setPrevCommands(prev => prev + result.answer + "\n\n");
     setPending(false);
+    setSlow(false);
   };
 
   return (
@@ -42,7 +48,7 @@ function Console() {
       <p className="console-line">Welcome to the Sixtus CLI.</p><br></br>
       {prevCommands ? <p className="console-line">{prevCommands}</p> : <></>}
       {pending ? (
-        <p className="console-line">Thinking…</p>
+        <p className="console-line">{slow ? "Waking up the server… the first answer can take up to a minute." : "Thinking…"}</p>
       ) : (
         <p className="console-line">
           {prompt}
