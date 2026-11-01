@@ -14,6 +14,13 @@ public class ChatLogger(AppDbContext db, IHttpContextAccessor httpContextAccesso
         {
             var httpContext = httpContextAccessor.HttpContext!;
 
+            // Kestrel listens dual-stack, so an IPv4 peer can arrive as ::ffff:a.b.c.d; hash one form per address.
+            var remoteIp = httpContext.Connection.RemoteIpAddress;
+            if (remoteIp is { IsIPv4MappedToIPv6: true })
+            {
+                remoteIp = remoteIp.MapToIPv4();
+            }
+
             db.ChatLogs.Add(new ChatLog
             {
                 Id = Guid.NewGuid(),
@@ -26,9 +33,7 @@ public class ChatLogger(AppDbContext db, IHttpContextAccessor httpContextAccesso
                 PreviousInteractionId = context.PreviousInteractionId,
                 Model = context.Model,
                 Latency = (int)context.Stopwatch.ElapsedMilliseconds,
-                // TODO: behind Cloudflare this is the proxy's IP. Use ForwardedHeaders
-                // (UseForwardedHeaders with ForwardedHeaders = "CF-Connecting-IP") to get the real client IP.
-                IpHash = IpHasher.Hash(httpContext.Connection.RemoteIpAddress?.ToString(), ipHashSalt),
+                IpHash = IpHasher.Hash(remoteIp?.ToString(), ipHashSalt),
                 UserAgent = httpContext.Request.Headers.UserAgent.ToString(),
                 Created = DateTimeOffset.UtcNow,
             });
