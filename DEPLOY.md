@@ -13,7 +13,7 @@ Either create a Blueprint from `render.yaml` (Render prompts for each secret), o
 | Setting | Value |
 | --- | --- |
 | Language / runtime | Docker |
-| Branch | the branch that has the site code (`main` only holds a starter commit) |
+| Branch | `main` |
 | Root directory | blank |
 | Dockerfile path | `./backend/Dockerfile` |
 | Docker build context | `./backend` |
@@ -43,7 +43,7 @@ Connect the repo (Workers & Pages > Create > Pages > Connect to Git):
 
 | Setting | Value |
 | --- | --- |
-| Production branch | the branch that has the site code |
+| Production branch | `main` |
 | Framework preset | None |
 | Root directory | `frontend` |
 | Build command | `npm run build` |
