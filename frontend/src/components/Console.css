@@ -10,8 +10,10 @@
 }
 
 .console p {
-  margin: 0; 
+  margin: 0;
+  min-width: 0;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .console-line {
