@@ -1,8 +1,21 @@
 .app_container {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    box-sizing: content-box;
     width: 100px;
     height: 120px;
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: inherit;
+    cursor: default;
     user-select: none;
     -webkit-user-drag: none;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .app_container:hover {
@@ -10,7 +23,14 @@
     border: 1px solid white;
 }
 
+.app_container:focus-visible {
+    background-color: rgba(255, 255, 255, 0.18);
+    outline: 2px solid white;
+    outline-offset: 2px;
+}
+
 .icon {
+    display: block;
     width: 100%;
     height: 100px;
     background-size: cover;
@@ -20,6 +40,7 @@
 }
 
 .label {
+    display: block;
     width: 100%;
     height: 10px;
     color: white;

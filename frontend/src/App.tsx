@@ -94,12 +94,12 @@ function App() {
 
   return (
     <>
-    <div className="desktop">
+    <main className="desktop">
     <AppIcon name='Resume' imageUrl={resumeIcon} col={1} row={1} onClick={() => handleClick(AppType.Resume)} />
     <AppIcon name='Console' imageUrl={terminalIcon} col={1} row={2} onClick={() => handleClick(AppType.Console)} />
     <AppIcon name='LinkedIn' imageUrl={linkedInIcon} col={1} row={3} onClick={() => handleClick(AppType.LinkedIn)} />
     <AppIcon name='GitHub' imageUrl={gitHubIcon} col={1} row={4} onClick={() => handleClick(AppType.Github)} />
-    </div>
+    </main>
     </>
   );
 }
