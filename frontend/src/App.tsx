@@ -77,7 +77,7 @@ function App() {
       }
       case AppType.LinkedIn:
         window.open(
-          "https://www.linkedin.com/in/sixtus-ijoma-12a5a4194/",
+          "https://www.linkedin.com/in/sixtusijoma/",
           "_blank",
           "noopener,noreferrer",
         );
