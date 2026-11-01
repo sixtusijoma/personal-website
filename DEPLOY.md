@@ -78,7 +78,7 @@ Render puts Cloudflare and then its own internal proxy in front of the container
 
 ## Cold starts
 
-Render's free instance sleeps after about 15 minutes idle and takes up to a minute to wake. Opening the console sends a request to `/api/health` to start waking the backend. If an answer takes longer than 5 seconds, the console shows "Waking up the server…". Requests time out after 90 seconds.
+Render's free instance sleeps after about 15 minutes idle and takes up to a minute to wake. Loading the page sends a request to `/api/health` once, so the backend starts waking before the visitor opens the console. If an answer takes longer than 5 seconds, the console shows "Waking up the server…". Requests time out after 90 seconds.
 
 ## Running the container locally
 

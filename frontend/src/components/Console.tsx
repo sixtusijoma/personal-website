@@ -1,6 +1,6 @@
 import "./Console.css";
-import { ask, wakeServer } from "../api/chat";
-import { useEffect, useRef, useState } from "react";
+import { ask } from "../api/chat";
+import { useRef, useState } from "react";
 
 function Console() {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -12,10 +12,6 @@ function Console() {
   const [prevCommands, setPrevCommands] = useState("");
   const [pending, setPending] = useState(false);
   const [slow, setSlow] = useState(false);
-
-  useEffect(() => {
-    wakeServer();
-  }, []);
 
   const handleKeyDown = async (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key !== "Enter" || pending) {
