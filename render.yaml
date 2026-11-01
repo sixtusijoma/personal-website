@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: sixtus-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    buildFilter:
+      paths:
+        - backend/**
+    healthCheckPath: /api/health
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: SUPABASE_DB_CONNECTION
+        sync: false
+      - key: IP_HASH_SALT
+        sync: false
+      - key: PROFILE_JSON
+        sync: false
+      - key: BIRTH_DATE
+        sync: false
