@@ -8,8 +8,3 @@
 - change app text font
 -liquid glass taskbar?
 - projects, about, contact, photos, github, notes
-
-hosting (do these when the site goes live):
-- backend/Program.cs CORS (AddCors + app.UseCors): delete it if frontend and backend share one domain, otherwise replace localhost:5173 with the real frontend domain
-- backend/Program.cs app.UseHttpsRedirection(): remove it, Cloudflare handles HTTPS and talks to the backend over plain HTTP
-- backend/Program.cs CF-Connecting-IP TODO: add forwarded headers so IP hashes use the visitor's real IP instead of Cloudflare's

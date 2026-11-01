@@ -4,11 +4,13 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using backend.Data;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
+using IPNetwork = System.Net.IPNetwork;
 
 var builder = WebApplication.CreateBuilder(args);
 
-string[] requiredKeys = ["GEMINI_API_KEY", "PROFILE_JSON", "SUPABASE_DB_CONNECTION", "IP_HASH_SALT", "BIRTH_DATE"];
+string[] requiredKeys = ["GEMINI_API_KEY", "PROFILE_JSON", "SUPABASE_DB_CONNECTION", "IP_HASH_SALT", "BIRTH_DATE", "CORS_ALLOWED_ORIGINS"];
 var missing = requiredKeys.Where(k => string.IsNullOrWhiteSpace(builder.Configuration[k])).ToList();
 
 if (missing.Count > 0)
@@ -25,10 +27,31 @@ if (!DateOnly.TryParseExact(builder.Configuration["BIRTH_DATE"], "yyyy-MM-dd", C
     throw new InvalidOperationException("BIRTH_DATE must be in yyyy-MM-dd format.");
 }
 
+var allowedOrigins = builder.Configuration["CORS_ALLOWED_ORIGINS"]!
+    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
-        policy.WithOrigins("http://localhost:5173").AllowAnyHeader().AllowAnyMethod());
+        policy.WithOrigins(allowedOrigins)
+            .WithMethods("GET", "POST")
+            .WithHeaders("Content-Type")
+            .SetPreflightMaxAge(TimeSpan.FromHours(1)));
+});
+
+// Render serves every request through Cloudflare and then its own internal proxy, each appending to
+// X-Forwarded-For. Walking the whole chain right to left and stopping at the first hop outside these
+// networks yields the visitor's IP, and entries a client forges at the left end are never reached.
+var trustedProxyNetworks = builder.Configuration.GetSection("TrustedProxyNetworks").Get<string[]>() ?? [];
+
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor;
+    options.ForwardLimit = null;
+    foreach (var network in trustedProxyNetworks)
+    {
+        options.KnownIPNetworks.Add(IPNetwork.Parse(network));
+    }
 });
 
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -44,7 +67,10 @@ builder.Services.AddHttpClient("gemini", c =>
 
 var app = builder.Build();
 
-app.UseHttpsRedirection();
+app.UseForwardedHeaders();
+app.UseCors();
+
+app.MapGet("/api/health", () => Results.Ok());
 
 var geminiJsonOptions = new JsonSerializerOptions
 {
@@ -132,7 +158,6 @@ app.MapPost("/api/chat", async (ChatRequest request, ChatLogger chatLogger, IHtt
         return Results.Ok(new { answer = failureAnswer });
     }
 });
-app.UseCors();
 
 app.Run();
 
