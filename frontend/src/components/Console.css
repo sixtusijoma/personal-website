@@ -1,0 +1,48 @@
+.console {
+  box-sizing: border-box;
+  height: 100%;
+  overflow-y: auto;
+  margin: 0;
+  padding: 8px;
+  background: black;
+  color: white;
+  font-family: ui-monospace, Consolas, "Cascadia Mono", monospace;
+}
+
+.console p {
+  margin: 0; 
+  white-space: pre-wrap;
+}
+
+.console-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5ch;
+}
+
+.console-input {
+  flex: 1 1 12ch;
+  min-width: 0;
+  width: auto;
+  background: black;
+  color: white;
+  border: none;
+  outline: none;
+  font: inherit;
+  caret-color: white;
+  caret-shape: block;
+}
+
+/* Phones: 16px stops iOS from zooming into the input, and the input gets its own full line. */
+@media (max-width: 767px) {
+  .console {
+    font-size: 16px;
+  }
+
+  .console-input {
+    flex-basis: 100%;
+    padding: 4px 0;
+    border-bottom: 1px solid #555;
+  }
+}

@@ -1,0 +1,10 @@
+**/bin/
+**/obj/
+Dockerfile
+.dockerignore
+*.user
+.env
+.env.*
+profile.json
+appsettings.Development.json
+Properties/launchSettings.json
