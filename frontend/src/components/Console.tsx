@@ -41,7 +41,9 @@ function Console() {
 
   return (
     <div className="console" onClick={() => inputRef.current?.focus()}>
-      <p className="console-line">Welcome to the Sixtus CLI.</p><br></br>
+      <p className="console-line">Welcome to the Sixtus CLI.</p>
+      <p className="console-line">Ask anything about Sixtus: who he is, what he’s done, or whatever you’re curious about.</p>
+      <br></br>
       {prevCommands ? <p className="console-line">{prevCommands}</p> : <></>}
       {pending ? (
         <p className="console-line">{slow ? "Waking up the server… the first answer can take up to a minute." : "Thinking…"}</p>
