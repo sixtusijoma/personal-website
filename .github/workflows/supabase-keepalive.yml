@@ -42,11 +42,13 @@ jobs:
       - name: Keep this workflow enabled
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
         run: gh workflow enable supabase-keepalive.yml
 
       - name: Warn if GitHub may disable the schedule soon
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
           pushed_at="$(gh api "repos/${GITHUB_REPOSITORY}" --jq .pushed_at)"
