@@ -62,7 +62,7 @@ No `_redirects` file is needed. The site has no client-side routes, and Pages al
 
 ## Database migrations
 
-Migrations are **not** applied on startup. The production database already has the current schema plus the hand-applied `keepalive()` function. A failing migration at startup would crash-loop the service, and Render's free tier has no pre-deploy step. When you add a migration, apply it yourself before deploying the code that needs it:
+Migrations are **not** applied on startup. The production database already has the current schema, including the `keepalive_heartbeat` table and `keepalive()` RPC (Supabase migrations `keepalive_heartbeat` and `keepalive_private_writer`). A failing migration at startup would crash-loop the service, and Render's free tier has no pre-deploy step. When you add an Entity Framework migration, apply it yourself before deploying the code that needs it:
 
 ```sh
 cd backend
@@ -70,7 +70,15 @@ dotnet tool install --global dotnet-ef --version 10.0.13
 dotnet ef migrations script --idempotent -o ../migrate.sql
 ```
 
-Review `migrate.sql`, run it in the Supabase SQL editor (or `psql`), and delete the file. The idempotent script checks `__EFMigrationsHistory` and only applies missing migrations. It doesn't touch `keepalive()`, and running it against an up-to-date database does nothing. Alternatively, export `SUPABASE_DB_CONNECTION` in your shell and run `dotnet ef database update`.
+Review `migrate.sql`, run it in the Supabase SQL editor (or `psql`), and delete the file. The idempotent script checks `__EFMigrationsHistory` and only applies missing Entity Framework migrations. It doesn't touch the `keepalive()` RPC or `keepalive_heartbeat` table, and running it against an up-to-date database does nothing. Alternatively, export `SUPABASE_DB_CONNECTION` in your shell and run `dotnet ef database update`.
+
+## Supabase keepalive
+
+A daily GitHub Actions workflow at [`.github/workflows/supabase-keepalive.yml`](.github/workflows/supabase-keepalive.yml) POSTs to `/rest/v1/rpc/keepalive` with the anon key. That RPC inserts a row into `public.keepalive_heartbeat` and deletes rows older than 30 days. The table has RLS enabled and no policies, and `anon` has no direct table privileges; only the RPC is executable by `anon`.
+
+The workflow fails if the RPC does not return a 2xx status. After a successful ping it runs `gh workflow enable` so a manually disabled workflow can turn itself back on. It cannot turn itself back on after GitHub has already disabled the schedule for inactivity, because the job would not run. To catch that earlier, the job fails if the repository's last push is more than 50 days old, which should send a failed-run email while the cron still works. A normal commit to the repo resets that 60-day clock; dummy keepalive commits are not used.
+
+The cron is `17 13 * * *` (1:17 PM UTC, 8:17 AM ET in winter). The workflow also supports `workflow_dispatch`.
 
 ## Visitor IPs
 

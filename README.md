@@ -104,7 +104,7 @@ On the frontend, `VITE_API_BASE_URL` sets the backend's public origin at build t
 - **Frontend:** Cloudflare Pages, root directory `frontend`, build command `npm run build`, output `dist`. Set `VITE_API_BASE_URL` to the backend URL and `NODE_VERSION` to `22`.
 - **Backend:** Render free web service built from `backend/Dockerfile` (or the [`render.yaml`](render.yaml) Blueprint), health check `/api/health`. The free instance sleeps after about 15 minutes idle and can take up to a minute to wake.
 - **Database:** Supabase Postgres. Migrations are not applied on startup; apply them by hand before deploying code that needs them.
-- **Keepalive:** a scheduled GitHub Actions workflow ([`.github/workflows/supabase-keepalive.yml`](.github/workflows/supabase-keepalive.yml)) pings Supabase twice a week so the free project isn't paused.
+- **Keepalive:** a daily GitHub Actions workflow ([`.github/workflows/supabase-keepalive.yml`](.github/workflows/supabase-keepalive.yml)) POSTs to a `keepalive` RPC that writes a heartbeat row in Postgres, so the free Supabase project isn't paused for inactivity. The job also re-enables the workflow via the GitHub API and fails if the repo has gone 50 days without a push, because GitHub disables scheduled workflows in public repos after 60 days without repository activity.
 
 See [DEPLOY.md](DEPLOY.md) for the full settings, migrations, visitor IP handling and running the container locally.
 

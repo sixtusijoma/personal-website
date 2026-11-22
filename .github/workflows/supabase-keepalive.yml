@@ -2,10 +2,13 @@ name: Supabase keepalive
 
 on:
   schedule:
-    - cron: "0 12 * * 1,4"
+    # 1:17 PM UTC daily (8:17 AM ET in winter, 9:17 AM ET in summer)
+    - cron: "17 13 * * *"
   workflow_dispatch:
 
-permissions: {}
+permissions:
+  actions: write
+  contents: read
 
 jobs:
   ping:
@@ -16,5 +19,45 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
-          curl -fsS "$SUPABASE_URL/rest/v1/rpc/keepalive" \
-            -H "apikey: $SUPABASE_ANON_KEY"
+          set -euo pipefail
+          if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_ANON_KEY:-}" ]; then
+            echo "Missing SUPABASE_URL or SUPABASE_ANON_KEY secret"
+            exit 1
+          fi
+          body="$(mktemp)"
+          trap 'rm -f "$body"' EXIT
+          http_code="$(curl -sS -o "$body" -w "%{http_code}" -X POST \
+            "$SUPABASE_URL/rest/v1/rpc/keepalive" \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{}')"
+          if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
+            echo "keepalive RPC failed with HTTP $http_code"
+            cat "$body"
+            exit 1
+          fi
+          echo "OK HTTP $http_code: $(cat "$body")"
+
+      - name: Keep this workflow enabled
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow enable supabase-keepalive.yml
+
+      - name: Warn if GitHub may disable the schedule soon
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          pushed_at="$(gh api "repos/${GITHUB_REPOSITORY}" --jq .pushed_at)"
+          echo "Last repository push: $pushed_at"
+          # Fail 10 days before GitHub's 60-day scheduled-workflow disablement
+          # so a failed-run email arrives while the cron still works.
+          cutoff="$(date -u -d '50 days ago' +%s)"
+          pushed="$(date -u -d "$pushed_at" +%s)"
+          if [ "$pushed" -lt "$cutoff" ]; then
+            echo "The last push was more than 50 days ago."
+            echo "GitHub disables scheduled workflows in public repos after 60 days without repository activity."
+            echo "Push a commit to this repo (or re-enable the workflow after it is disabled) so the daily keepalive keeps running."
+            exit 1
+          fi
